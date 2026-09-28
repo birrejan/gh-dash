@@ -537,3 +537,56 @@ func TestViewChecksBar_NarrowWidth_NoPanic(t *testing.T) {
 		}, "viewChecksBar panicked with width=%d", width)
 	}
 }
+
+// makeAppCheckSuite is the suite GitHub creates for a non-Actions app on every
+// push; it has no workflow run and stays QUEUED if the app never reports.
+func makeAppCheckSuite(appName string) data.CheckSuiteNode {
+	suite := data.CheckSuiteNode{Status: "QUEUED"}
+	suite.App.Name = graphql.String(appName)
+	return suite
+}
+
+func TestGetChecksStats_IgnoresAppSuitesThatNeverStart(t *testing.T) {
+	opts := checksTestOptions{
+		checkSuites: data.CheckSuites{
+			TotalCount: 3,
+			Nodes: []data.CheckSuiteNode{
+				makeCheckSuite("CI", "COMPLETED", "SUCCESS"),
+				makeAppCheckSuite("Supabase"),
+				makeAppCheckSuite("Claude"),
+			},
+		},
+		checkRuns: []data.CheckRun{
+			makeCheckRun("lint", "COMPLETED", "SUCCESS"),
+			makeCheckRun("test", "COMPLETED", "SUCCESS"),
+		},
+		rollupState: "SUCCESS",
+	}
+
+	m := newTestModelForChecks(t, opts)
+	stats := m.getChecksStats()
+
+	require.Equal(t, 0, stats.inProgress,
+		"app suites without a workflow run must not count as in progress")
+	require.Equal(t, 2, stats.succeeded)
+}
+
+func TestRenderChecks_IgnoresAppSuitesThatNeverStart(t *testing.T) {
+	opts := checksTestOptions{
+		checkSuites: data.CheckSuites{
+			TotalCount: 2,
+			Nodes: []data.CheckSuiteNode{
+				makeCheckSuite("Build", "QUEUED", ""),
+				makeAppCheckSuite("Supabase"),
+			},
+		},
+		checkRuns:   []data.CheckRun{},
+		rollupState: "PENDING",
+	}
+
+	m := newTestModelForChecks(t, opts)
+	got := m.renderChecks()
+
+	require.Contains(t, got, "Build")
+	require.NotContains(t, got, "Supabase")
+}
