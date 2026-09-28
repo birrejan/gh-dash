@@ -2,15 +2,19 @@ package prssection
 
 import (
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prompt"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
 
 // newTestModel creates a minimal Model with the prompt confirmation box
@@ -104,8 +108,31 @@ func TestConfirmation_CancelWithCtrlC(t *testing.T) {
 	_ = cmd
 }
 
+func TestUpdatePRMsg_ReadyForReviewSetsDraftState(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../../../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+	ctx := &context.ProgramContext{Config: &cfg, View: config.PRsView}
+	ctx.Theme = theme.ParseTheme(ctx.Config)
+	ctx.Styles = context.InitStyles(ctx.Theme)
+
+	for _, ready := range []bool{true, false} {
+		m := NewModel(0, ctx, config.PrsSectionConfig{Title: "Test"}, time.Now(), time.Now())
+		m.Prs = []prrow.Data{
+			{Primary: &data.PullRequestData{Number: 42, State: "OPEN", IsDraft: ready}},
+		}
+
+		_, _ = m.Update(tasks.UpdatePRMsg{PrNumber: 42, ReadyForReview: &ready})
+
+		require.Equal(t, !ready, m.Prs[0].Primary.IsDraft,
+			"ReadyForReview=%v should leave IsDraft=%v", ready, !ready)
+	}
+}
+
 func TestConfirmation_AllActions(t *testing.T) {
-	actions := []string{"close", "reopen", "ready", "merge", "update", "approveWorkflows"}
+	actions := []string{"close", "reopen", "ready", "draft", "merge", "update", "approveWorkflows"}
 
 	for _, action := range actions {
 		t.Run(action+"_empty_input_does_not_confirm", func(t *testing.T) {

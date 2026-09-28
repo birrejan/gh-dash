@@ -44,6 +44,34 @@ func TestUpdatePR_MsgDoesNotMarkPRClosed(t *testing.T) {
 	)
 }
 
+func TestPRToDraft_TaskConfiguration(t *testing.T) {
+	section := SectionIdentifier{Id: 2, Type: "pr"}
+	task := prToDraftTask(section, mockIssue{number: 42, repoName: "owner/repo"})
+
+	require.Equal(t, "pr_draft_42", task.Id)
+	require.Equal(t, []string{"pr", "ready", "--undo", "42", "-R", "owner/repo"}, task.Args)
+	require.Equal(t, section, task.Section)
+	require.Equal(t, "Converting PR #42 to draft", task.StartText)
+	require.Equal(t, "PR #42 has been converted to draft", task.FinishedText)
+
+	updateMsg, ok := task.Msg(nil, nil).(UpdatePRMsg)
+	require.True(t, ok, "Msg should return UpdatePRMsg")
+	require.NotNil(t, updateMsg.ReadyForReview)
+	require.False(t, *updateMsg.ReadyForReview)
+}
+
+func TestPRToDraft_FailureLeavesDraftStateAlone(t *testing.T) {
+	task := prToDraftTask(SectionIdentifier{Id: 2, Type: "pr"}, mockIssue{
+		number:   42,
+		repoName: "owner/repo",
+	})
+
+	updateMsg, ok := task.Msg(nil, fmt.Errorf("gh failed")).(UpdatePRMsg)
+	require.True(t, ok, "Msg should return UpdatePRMsg")
+	require.Nil(t, updateMsg.ReadyForReview,
+		"a failed conversion must not show the PR as a draft")
+}
+
 func TestApproveWorkflows_TaskConfiguration(t *testing.T) {
 	var capturedTask context.Task
 

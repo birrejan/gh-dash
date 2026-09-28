@@ -458,7 +458,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case key.Matches(msg, keys.PRKeys.Ready):
 				if currRowData != nil {
-					cmd = m.promptConfirmation(currSection, "ready")
+					action := "ready"
+					if pr, ok := currRowData.(*prrow.Data); ok && pr.Primary != nil &&
+						!pr.Primary.IsDraft {
+						action = "draft"
+					}
+					cmd = m.promptConfirmation(currSection, action)
 				}
 				return m, cmd
 
