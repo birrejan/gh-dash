@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"text/template"
@@ -31,6 +33,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/sidebar"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tabs"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/keys"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
@@ -2316,4 +2319,59 @@ func TestNotificationCommandTemplateVariables(t *testing.T) {
 			require.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+func TestCustomKeybinding_BackgroundKeepsTheTerminal(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+	out := filepath.Join(t.TempDir(), "ran")
+	cfg.Keybindings.Prs = []config.Keybinding{
+		{Key: "i", Name: "open pane", Command: "echo {{.PrNumber}} > " + out, Background: true},
+		{Key: "j", Command: "true"},
+	}
+
+	var started []context.Task
+	ctx := &context.ProgramContext{
+		Config: &cfg,
+		View:   config.PRsView,
+		StartTask: func(task context.Task) tea.Cmd {
+			started = append(started, task)
+			return nil
+		},
+	}
+	ctx.Theme = theme.ParseTheme(ctx.Config)
+	ctx.Styles = context.InitStyles(ctx.Theme)
+	prSection := prssection.NewModel(
+		0, ctx, config.PrsSectionConfig{Title: "Test"}, time.Now(), time.Now(),
+	)
+	prSection.Prs = []prrow.Data{{Primary: &data.PullRequestData{Number: 42, State: "OPEN"}}}
+	m := Model{ctx: ctx, keys: keys.Keys, prs: []section.Section{&prSection}}
+
+	finished, ok := m.executeKeybinding("i")().(constants.TaskFinishedMsg)
+	require.True(t, ok, "a background command should report back as a task")
+	require.NoError(t, finished.Err)
+	require.Len(t, started, 1)
+	require.Equal(t, "open pane", started[0].StartText)
+	require.Equal(t, started[0].Id, finished.TaskId)
+	ran, err := os.ReadFile(out)
+	require.NoError(t, err)
+	require.Equal(t, "42\n", string(ran))
+
+	_, isTask := m.executeKeybinding("j")().(constants.TaskFinishedMsg)
+	require.False(t, isTask, "without background the command still gets the terminal")
+}
+
+func TestCustomKeybinding_BackgroundFailureShowsOutput(t *testing.T) {
+	m := Model{ctx: &context.ProgramContext{
+		StartTask: func(task context.Task) tea.Cmd { return nil },
+	}}
+
+	msg := m.executeBackgroundCommand(config.Keybinding{Name: "fail"}, "echo boom >&2; exit 3")()
+
+	finished, ok := msg.(constants.TaskFinishedMsg)
+	require.True(t, ok)
+	require.ErrorContains(t, finished.Err, "boom")
 }

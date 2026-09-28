@@ -9,6 +9,20 @@ When a user presses the key or key combination the dashboard shells out and exec
 
 To help you identify your custom commands, an additional `name` property can be supplied to describe it in the help menu.
 
+By default the dashboard hands the terminal over to the command and redraws once it exits, which is
+what an interactive program like `lazygit` needs. A command that doesn't need the terminal can set
+`background: true` instead: it runs while the dashboard stays on screen, and its progress and any
+error appear in the footer, labelled with its `name`.
+
+```yaml
+keybindings:
+  prs:
+    - key: U
+      name: update branch
+      background: true
+      command: gh pr update-branch {{.PrNumber}} --repo {{.RepoName}}
+```
+
 There are 3 types of keybindings: `universal`, `prs` and `issues`.
 
 ## Key Values
