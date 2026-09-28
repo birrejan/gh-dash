@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"strings"
 	"text/template"
 	"time"
 
@@ -73,7 +74,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 		}
 
 		log.Info("executing keybind", "key", keybinding.Key, "command", keybinding.Command)
-		return m.runCustomUniversalCommand(keybinding.Command)
+		return m.runCustomUniversalCommand(keybinding)
 	}
 
 	switch m.ctx.View {
@@ -85,7 +86,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 
 			switch data := currRowData.(type) {
 			case *data.IssueData:
-				return m.runCustomIssueCommand(keybinding.Command, data)
+				return m.runCustomIssueCommand(keybinding, data)
 			}
 		}
 	case config.PRsView:
@@ -98,7 +99,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 
 			switch data := currRowData.(type) {
 			case *prrow.Data:
-				return m.runCustomPRCommand(keybinding.Command, data)
+				return m.runCustomPRCommand(keybinding, data)
 			}
 		}
 	case config.RepoView:
@@ -111,7 +112,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 
 			switch data := currRowData.(type) {
 			case *prrow.Data:
-				return m.runCustomBranchCommand(keybinding.Command, data)
+				return m.runCustomBranchCommand(keybinding, data)
 			}
 		}
 	case config.NotificationsView:
@@ -127,7 +128,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 				keybinding.Command,
 			)
 			if nData, ok := currRowData.(*notificationrow.Data); ok {
-				return m.runCustomNotificationCommand(keybinding.Command, nData)
+				return m.runCustomNotificationCommand(keybinding, nData)
 			}
 		}
 
@@ -145,7 +146,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 						"command",
 						keybinding.Command,
 					)
-					return m.runCustomNotificationPRCommand(keybinding.Command, nData)
+					return m.runCustomNotificationPRCommand(keybinding, nData)
 				}
 			case "Issue":
 				for _, keybinding := range m.ctx.Config.Keybindings.Issues {
@@ -159,7 +160,7 @@ func (m *Model) executeKeybinding(key string) tea.Cmd {
 						"command",
 						keybinding.Command,
 					)
-					return m.runCustomNotificationIssueCommand(keybinding.Command, nData)
+					return m.runCustomNotificationIssueCommand(keybinding, nData)
 				}
 			}
 		}
@@ -207,9 +208,10 @@ func resolveTemplateInput(
 }
 
 // runCustomCommand executes a user-defined command.
-// commandTemplate is a template string that will be parsed with the input data.
+// keybinding.Command is a template string that will be parsed with the input data.
 // contextData is a map of key-value pairs of data specific to the context the command is being run in.
-func (m *Model) runCustomCommand(commandTemplate string, contextData *map[string]any) tea.Cmd {
+func (m *Model) runCustomCommand(keybinding config.Keybinding, contextData *map[string]any) tea.Cmd {
+	commandTemplate := keybinding.Command
 	input := resolveTemplateInput(contextData, m.ctx.Config.RepoPaths, m.ctx.RepoPath)
 
 	cmd, err := template.New("keybinding_command").Parse(commandTemplate)
@@ -228,11 +230,11 @@ func (m *Model) runCustomCommand(commandTemplate string, contextData *map[string
 			return constants.ErrMsg{Err: fmt.Errorf("failed to parsetemplate %s", commandTemplate)}
 		}
 	}
-	return m.executeCustomCommand(buff.String())
+	return m.executeCommand(keybinding, buff.String())
 }
 
-func (m *Model) runCustomPRCommand(commandTemplate string, prData *prrow.Data) tea.Cmd {
-	return m.runCustomCommand(commandTemplate,
+func (m *Model) runCustomPRCommand(keybinding config.Keybinding, prData *prrow.Data) tea.Cmd {
+	return m.runCustomCommand(keybinding,
 		&map[string]any{
 			"RepoName":    prData.GetRepoNameWithOwner(),
 			"PrNumber":    prData.Primary.Number,
@@ -242,8 +244,8 @@ func (m *Model) runCustomPRCommand(commandTemplate string, prData *prrow.Data) t
 		})
 }
 
-func (m *Model) runCustomIssueCommand(commandTemplate string, issueData *data.IssueData) tea.Cmd {
-	return m.runCustomCommand(commandTemplate,
+func (m *Model) runCustomIssueCommand(keybinding config.Keybinding, issueData *data.IssueData) tea.Cmd {
+	return m.runCustomCommand(keybinding,
 		&map[string]any{
 			"RepoName":    issueData.GetRepoNameWithOwner(),
 			"IssueNumber": issueData.Number,
@@ -253,9 +255,9 @@ func (m *Model) runCustomIssueCommand(commandTemplate string, issueData *data.Is
 	)
 }
 
-func (m *Model) runCustomBranchCommand(commandTemplate string, branchData *prrow.Data) tea.Cmd {
+func (m *Model) runCustomBranchCommand(keybinding config.Keybinding, branchData *prrow.Data) tea.Cmd {
 	if reflect.ValueOf(branchData).IsNil() {
-		return m.executeCustomCommand(commandTemplate)
+		return m.executeCommand(keybinding, keybinding.Command)
 	}
 	input := map[string]any{
 		"RepoPath": m.ctx.RepoPath,
@@ -270,16 +272,16 @@ func (m *Model) runCustomBranchCommand(commandTemplate string, branchData *prrow
 				"Author":      branchData.Primary.Author.Login,
 			})
 	}
-	return m.runCustomCommand(commandTemplate, &input)
+	return m.runCustomCommand(keybinding, &input)
 }
 
-func (m *Model) runCustomUniversalCommand(commandTemplate string) tea.Cmd {
+func (m *Model) runCustomUniversalCommand(keybinding config.Keybinding) tea.Cmd {
 	input := map[string]any{"RepoPath": m.ctx.RepoPath}
-	return m.runCustomCommand(commandTemplate, &input)
+	return m.runCustomCommand(keybinding, &input)
 }
 
 func (m *Model) runCustomNotificationPRCommand(
-	commandTemplate string,
+	keybinding config.Keybinding,
 	nData *notificationrow.Data,
 ) tea.Cmd {
 	fields := map[string]any{
@@ -291,11 +293,11 @@ func (m *Model) runCustomNotificationPRCommand(
 		fields["BaseRefName"] = pr.Primary.BaseRefName
 		fields["Author"] = pr.Primary.Author.Login
 	}
-	return m.runCustomCommand(commandTemplate, &fields)
+	return m.runCustomCommand(keybinding, &fields)
 }
 
 func (m *Model) runCustomNotificationIssueCommand(
-	commandTemplate string,
+	keybinding config.Keybinding,
 	nData *notificationrow.Data,
 ) tea.Cmd {
 	fields := map[string]any{
@@ -305,21 +307,53 @@ func (m *Model) runCustomNotificationIssueCommand(
 	if issue := m.notificationView.GetSubjectIssue(); issue != nil {
 		fields["Author"] = issue.Author.Login
 	}
-	return m.runCustomCommand(commandTemplate, &fields)
+	return m.runCustomCommand(keybinding, &fields)
 }
 
 func (m *Model) runCustomNotificationCommand(
-	commandTemplate string,
+	keybinding config.Keybinding,
 	nData *notificationrow.Data,
 ) tea.Cmd {
 	fields := map[string]any{
 		"RepoName": nData.GetRepoNameWithOwner(),
 		"Number":   nData.GetNumber(),
 	}
-	return m.runCustomCommand(commandTemplate, &fields)
+	return m.runCustomCommand(keybinding, &fields)
 }
 
 type execProcessFinishedMsg struct{}
+
+func (m *Model) executeCommand(keybinding config.Keybinding, cmd string) tea.Cmd {
+	if keybinding.Background {
+		return m.executeBackgroundCommand(keybinding, cmd)
+	}
+	return m.executeCustomCommand(cmd)
+}
+
+// executeBackgroundCommand runs cmd without handing it the terminal, so the
+// dashboard stays on screen; progress and errors show up as a task in the footer.
+func (m *Model) executeBackgroundCommand(keybinding config.Keybinding, cmd string) tea.Cmd {
+	log.Debug("executing custom command in the background", "cmd", cmd)
+	text := keybinding.Name
+	if text == "" {
+		text = cmd
+	}
+	id := fmt.Sprintf("custom_command_%d", time.Now().UnixNano())
+	startCmd := m.ctx.StartTask(context.Task{
+		Id:           id,
+		StartText:    text,
+		FinishedText: text,
+		State:        context.TaskStart,
+	})
+
+	return tea.Batch(startCmd, func() tea.Msg {
+		out, err := shell.Command(cmd).CombinedOutput()
+		if output := strings.TrimSpace(string(out)); err != nil && output != "" {
+			err = fmt.Errorf("%w: %s", err, output)
+		}
+		return constants.TaskFinishedMsg{TaskId: id, Err: err}
+	})
+}
 
 func (m *Model) executeCustomCommand(cmd string) tea.Cmd {
 	log.Debug("executing custom command", "cmd", cmd)

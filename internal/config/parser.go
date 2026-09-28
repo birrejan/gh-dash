@@ -201,10 +201,11 @@ type RepoConfig struct {
 }
 
 type Keybinding struct {
-	Key     string `yaml:"key"`
-	Command string `yaml:"command,omitempty"`
-	Builtin string `yaml:"builtin,omitempty"`
-	Name    string `yaml:"name,omitempty"`
+	Key        string `yaml:"key"`
+	Command    string `yaml:"command,omitempty"`
+	Builtin    string `yaml:"builtin,omitempty"`
+	Name       string `yaml:"name,omitempty"`
+	Background bool   `yaml:"background,omitempty"`
 }
 
 func (kb Keybinding) NewBinding(previous *key.Binding) key.Binding {

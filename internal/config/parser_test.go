@@ -186,6 +186,28 @@ func TestParser(t *testing.T) {
 		require.ElementsMatch(t, []string{"a", "b", "c"}, keys)
 	})
 
+	t.Run("Should keep non-string keybinding fields through the merge", func(t *testing.T) {
+		cfgPath := path.Join(t.TempDir(), "config.yml")
+		err := os.WriteFile(cfgPath, []byte(`keybindings:
+  prs:
+    - key: i
+      command: echo in the background
+      background: true
+    - key: j
+      command: echo in the terminal
+`), 0o644)
+		require.NoError(t, err)
+
+		parsed, err := ParseConfig(Location{ConfigFlag: cfgPath, SkipGlobalConfig: true})
+		testutils.AssertNoError(t, err)
+
+		background := map[string]bool{}
+		for _, kb := range parsed.Keybindings.Prs {
+			background[kb.Key] = kb.Background
+		}
+		require.Equal(t, map[string]bool{"i": true, "j": false}, background)
+	})
+
 	t.Run("Should accept ANSI color indices in theme", func(t *testing.T) {
 		cwd := Testwd(t)
 		parsed, err := ParseConfig(Location{
