@@ -2,6 +2,7 @@ package prssection
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 
@@ -9,7 +10,6 @@ import (
 	"charm.land/log/v2"
 	"github.com/gen2brain/beeep"
 
-	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
@@ -24,7 +24,6 @@ func (m *Model) watchChecks() tea.Cmd {
 	prNumber := pr.GetNumber()
 	title := pr.GetTitle()
 	repoNameWithOwner := pr.GetRepoNameWithOwner()
-	prData := pr.(*prrow.Data)
 	taskId := fmt.Sprintf("pr_reopen_%d", prNumber)
 	task := context.Task{
 		Id:           taskId,
@@ -58,15 +57,7 @@ func (m *Model) watchChecks() tea.Cmd {
 					"stderr", errb.String(), "stdout", outb.String())
 			}
 
-			renderedPr := prrow.PullRequest{Ctx: m.Ctx, Data: prData}
-			checksRollup := " Checks are pending"
-			switch renderedPr.GetStatusChecksRollup() {
-			case "SUCCESS":
-				checksRollup = "✅ Checks have passed"
-			case "FAILURE":
-				checksRollup = "❌ Checks have failed"
-			}
-
+			checksRollup := fetchChecksOutcome(prNumber, repoNameWithOwner)
 			err = beeep.Notify(
 				fmt.Sprintf("gh-dash: %s", title),
 				fmt.Sprintf("PR #%d in %s\n%s", prNumber, repoNameWithOwner, checksRollup),
@@ -87,4 +78,50 @@ func (m *Model) watchChecks() tea.Cmd {
 			},
 		}
 	})
+}
+
+// fetchChecksOutcome asks GitHub for the checks' final state once the watch ends.
+// The row data captured when watching started is stale by then.
+func fetchChecksOutcome(prNumber int, repoNameWithOwner string) string {
+	// gh exits non-zero for failing or pending checks but still prints the JSON.
+	out, _ := exec.Command(
+		"gh",
+		"pr",
+		"checks",
+		fmt.Sprint(prNumber),
+		"-R",
+		repoNameWithOwner,
+		"--json",
+		"bucket",
+	).Output()
+
+	var checks []struct{ Bucket string }
+	if err := json.Unmarshal(out, &checks); err != nil {
+		log.Error("Error reading checks result", "err", err, "output", string(out))
+		return "Couldn't read the checks result"
+	}
+	buckets := make([]string, 0, len(checks))
+	for _, check := range checks {
+		buckets = append(buckets, check.Bucket)
+	}
+	return summarizeChecks(buckets)
+}
+
+func summarizeChecks(buckets []string) string {
+	if len(buckets) == 0 {
+		return "No checks reported"
+	}
+	isPending := false
+	for _, bucket := range buckets {
+		switch bucket {
+		case "fail", "cancel":
+			return "❌ Checks have failed"
+		case "pending":
+			isPending = true
+		}
+	}
+	if isPending {
+		return " Checks are pending"
+	}
+	return "✅ Checks have passed"
 }
