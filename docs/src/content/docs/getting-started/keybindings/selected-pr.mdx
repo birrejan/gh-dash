@@ -92,10 +92,11 @@ Press <kbd>v</kbd> to approve the PR. When you do, the dashboard uses the
 Press <kbd>w</kbd> to watch the PR check and get a desktop notification if they succeed or fail. When you do, the dashboard uses the
 `gh pr checks --watch` command to watch the PR checks.
 
-## `W` - Mark PR as Ready for Review
+## `W` - Toggle PR Between Ready for Review and Draft
 
-Press <kbd>W</kbd> to mark the PR as ready for review. When you do, the dashboard uses the
-`gh pr ready` command to convert the PR from draft status to ready for review.
+Press <kbd>W</kbd> to toggle the PR's draft status. On a draft PR, the dashboard uses the
+`gh pr ready` command to mark it as ready for review. On a PR that's ready for review, it uses
+`gh pr ready --undo` to convert it back to a draft.
 
 ## `x` - Close PR
 

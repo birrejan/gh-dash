@@ -164,6 +164,37 @@ func PRReady(ctx *context.ProgramContext, section SectionIdentifier, pr data.Row
 	})
 }
 
+func prToDraftTask(section SectionIdentifier, pr data.RowData) GitHubTask {
+	prNumber := pr.GetNumber()
+	return GitHubTask{
+		Id: buildTaskId("pr_draft", prNumber),
+		Args: []string{
+			"pr",
+			"ready",
+			"--undo",
+			fmt.Sprint(prNumber),
+			"-R",
+			pr.GetRepoNameWithOwner(),
+		},
+		Section:      section,
+		StartText:    fmt.Sprintf("Converting PR #%d to draft", prNumber),
+		FinishedText: fmt.Sprintf("PR #%d has been converted to draft", prNumber),
+		Msg: func(c *exec.Cmd, err error) tea.Msg {
+			if err != nil {
+				return UpdatePRMsg{PrNumber: prNumber}
+			}
+			return UpdatePRMsg{
+				PrNumber:       prNumber,
+				ReadyForReview: utils.BoolPtr(false),
+			}
+		},
+	}
+}
+
+func PRToDraft(ctx *context.ProgramContext, section SectionIdentifier, pr data.RowData) tea.Cmd {
+	return fireTask(ctx, prToDraftTask(section, pr))
+}
+
 func MergePR(ctx *context.ProgramContext, section SectionIdentifier, pr data.RowData) tea.Cmd {
 	prNumber := pr.GetNumber()
 	c := exec.Command(

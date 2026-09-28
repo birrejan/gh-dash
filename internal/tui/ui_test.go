@@ -1022,6 +1022,71 @@ func TestSyncSidebar_NoOpWhenSidebarClosed(t *testing.T) {
 	})
 }
 
+func TestReadyKey_TogglesBetweenReadyAndDraft(t *testing.T) {
+	tests := []struct {
+		name           string
+		isDraft        bool
+		expectedAction string
+		expectedPrompt string
+	}{
+		{
+			name:           "draft PR is marked ready",
+			isDraft:        true,
+			expectedAction: "ready",
+			expectedPrompt: "Are you sure you want to mark this PR as ready? (y/N) ",
+		},
+		{
+			name:           "ready PR is converted to draft",
+			isDraft:        false,
+			expectedAction: "draft",
+			expectedPrompt: "Are you sure you want to convert this PR to draft? (y/N) ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.ParseConfig(config.Location{
+				ConfigFlag:       "../config/testdata/test-config.yml",
+				SkipGlobalConfig: true,
+			})
+			require.NoError(t, err)
+
+			ctx := &context.ProgramContext{
+				Config:    &cfg,
+				View:      config.PRsView,
+				StartTask: func(task context.Task) tea.Cmd { return nil },
+			}
+			ctx.Theme = theme.ParseTheme(ctx.Config)
+			ctx.Styles = context.InitStyles(ctx.Theme)
+
+			prSection := prssection.NewModel(
+				0, ctx, config.PrsSectionConfig{Title: "Test"}, time.Now(), time.Now(),
+			)
+			prSection.Prs = []prrow.Data{
+				{Primary: &data.PullRequestData{Number: 42, State: "OPEN", IsDraft: tt.isDraft}},
+			}
+
+			m := Model{
+				ctx:              ctx,
+				keys:             keys.Keys,
+				prs:              []section.Section{&prSection},
+				sidebar:          sidebar.NewModel(),
+				footer:           footer.NewModel(ctx),
+				tabs:             tabs.NewModel(ctx),
+				prView:           prview.NewModel(ctx),
+				issueSidebar:     issueview.NewModel(ctx),
+				branchSidebar:    branchsidebar.NewModel(ctx),
+				notificationView: notificationview.NewModel(ctx),
+			}
+
+			m.Update(tea.KeyPressMsg{Code: 'W', Text: "W"})
+
+			require.Equal(t, tt.expectedAction, prSection.GetPromptConfirmationAction())
+			require.Contains(t, prSection.GetPromptConfirmation(), tt.expectedPrompt)
+		})
+	}
+}
+
 func TestSyncMainContentDimensions_BottomMode(t *testing.T) {
 	tests := []struct {
 		name                  string

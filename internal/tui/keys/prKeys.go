@@ -82,7 +82,7 @@ var PRKeys = PRKeyMap{
 	),
 	Ready: key.NewBinding(
 		key.WithKeys("W"),
-		key.WithHelp("W", "ready for review"),
+		key.WithHelp("W", "toggle ready / draft"),
 	),
 	Merge: key.NewBinding(
 		key.WithKeys("m"),
