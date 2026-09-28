@@ -645,7 +645,7 @@ func mergeOption() koanf.Option {
 		// below can tell which sections this layer actually declared.
 		overridesCopy := maps.Copy(overrides)
 
-		unioned := make(map[string][]map[string]string, len(keybindingTypes))
+		unioned := make(map[string][]map[string]any, len(keybindingTypes))
 		for _, typ := range keybindingTypes {
 			unioned[typ] = mergeKeybindings(overrides, dest, typ)
 		}
@@ -735,49 +735,41 @@ func (parser ConfigParser) mergeConfigs(globalCfgPath, userProvidedCfgPath strin
 	return parser.unmarshalConfigWithDefaults()
 }
 
-func mergeKeybindings(overrides, dest map[string]any, typ string) []map[string]string {
-	byKey := make(map[string]map[string]string)
+func mergeKeybindings(overrides, dest map[string]any, typ string) []map[string]any {
+	byKey := make(map[string]map[string]any)
 	// dest first, then overrides, so a key bound in both resolves to overrides.
 	for _, layer := range []map[string]any{dest, overrides} {
 		for _, keybind := range keybindingsByType(layer, typ) {
-			if key, ok := keybind["key"]; ok {
+			if key, ok := keybind["key"].(string); ok {
 				byKey[key] = keybind
 			}
 		}
 	}
 
-	merged := make([]map[string]string, 0, len(byKey))
+	merged := make([]map[string]any, 0, len(byKey))
 	for _, keybind := range byKey {
 		merged = append(merged, keybind)
 	}
 	return merged
 }
 
-func keybindingsByType(layer map[string]any, typ string) []map[string]string {
+func keybindingsByType(layer map[string]any, typ string) []map[string]any {
 	keybindings, ok := layer["keybindings"].(map[string]any)
 	if !ok {
 		return nil
 	}
 
 	// Raw YAML parses to []any, but a previous merge pass writes the type back as
-	// []map[string]string, so both shapes can show up once 3+ layers are merged.
+	// []map[string]any, so both shapes can show up once 3+ layers are merged.
 	switch list := keybindings[typ].(type) {
-	case []map[string]string:
+	case []map[string]any:
 		return list
 	case []any:
-		out := make([]map[string]string, 0, len(list))
+		out := make([]map[string]any, 0, len(list))
 		for _, item := range list {
-			m, ok := item.(map[string]any)
-			if !ok {
-				continue
+			if m, ok := item.(map[string]any); ok {
+				out = append(out, m)
 			}
-			casted := make(map[string]string)
-			for key, val := range m {
-				if s, ok := val.(string); ok {
-					casted[key] = s
-				}
-			}
-			out = append(out, casted)
 		}
 		return out
 	default:

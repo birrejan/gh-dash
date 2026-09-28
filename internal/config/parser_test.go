@@ -266,3 +266,29 @@ func setupConfigEnvVar(t *testing.T) func() {
 		os.Unsetenv("GH_DASH_CONFIG")
 	}
 }
+
+func TestMergeKeybindings_KeepsNonStringFields(t *testing.T) {
+	dest := map[string]any{"keybindings": map[string]any{"prs": []any{
+		map[string]any{"key": "a", "command": "echo a", "enabled": true},
+	}}}
+	overrides := map[string]any{"keybindings": map[string]any{"prs": []any{
+		map[string]any{"key": "b", "command": "echo b", "limit": 3},
+	}}}
+
+	merged := mergeKeybindings(overrides, dest, "prs")
+
+	// A later layer re-reads the already-merged shape, as happens with 3+ layers.
+	remerged := mergeKeybindings(
+		map[string]any{},
+		map[string]any{"keybindings": map[string]any{"prs": merged}},
+		"prs",
+	)
+
+	byKey := map[string]map[string]any{}
+	for _, kb := range remerged {
+		byKey[kb["key"].(string)] = kb
+	}
+	require.Equal(t, true, byKey["a"]["enabled"])
+	require.Equal(t, 3, byKey["b"]["limit"])
+	require.Equal(t, "echo b", byKey["b"]["command"])
+}
