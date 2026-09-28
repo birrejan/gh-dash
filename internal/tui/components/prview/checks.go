@@ -461,7 +461,7 @@ func (sidebar *Model) renderChecks() string {
 				workflowName,
 			)
 			awaitingApproval = append(awaitingApproval, check)
-		} else if suite.Status == "QUEUED" || suite.Status == "PENDING" || suite.Status == "WAITING" {
+		} else if isQueuedWorkflow(suite) {
 			// Workflow is queued/pending (will run automatically)
 			check := lipgloss.JoinHorizontal(
 				lipgloss.Top,
@@ -647,12 +647,27 @@ func (m *Model) getChecksStats() checksStats {
 	for _, suite := range lastCommit.Commit.CheckSuites.Nodes {
 		if suite.Conclusion == "ACTION_REQUIRED" {
 			res.awaitingApproval++
-		} else if suite.Status == "QUEUED" || suite.Status == "PENDING" || suite.Status == "WAITING" {
+		} else if isQueuedWorkflow(suite) {
 			res.inProgress++
 		}
 	}
 
 	return res
+}
+
+// isQueuedWorkflow reports a GitHub Actions workflow that is queued but hasn't
+// started yet. Every other app with checks access (Supabase, Claude, …) also
+// gets a suite on each push, and that suite stays QUEUED forever when the app
+// never reports a check, so a suite without a workflow run doesn't count.
+func isQueuedWorkflow(suite data.CheckSuiteNode) bool {
+	if suite.WorkflowRun.Workflow.Name == "" {
+		return false
+	}
+	switch suite.Status {
+	case "QUEUED", "PENDING", "WAITING":
+		return true
+	}
+	return false
 }
 
 func (m *Model) numRequestedReviewOwners() int {
