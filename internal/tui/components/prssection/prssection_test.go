@@ -157,3 +157,24 @@ func TestConfirmation_AllActions(t *testing.T) {
 		})
 	}
 }
+
+func TestSummarizeChecks(t *testing.T) {
+	pending := summarizeChecks([]string{"pending"})
+	require.Contains(t, pending, "Checks are pending")
+
+	tests := map[string]struct {
+		buckets  []string
+		expected string
+	}{
+		"all passed":          {[]string{"pass", "skipping"}, "✅ Checks have passed"},
+		"a failure wins":      {[]string{"pass", "pending", "fail"}, "❌ Checks have failed"},
+		"a cancellation wins": {[]string{"pass", "cancel"}, "❌ Checks have failed"},
+		"still running":       {[]string{"pass", "pending"}, pending},
+		"no checks":           {nil, "No checks reported"},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, summarizeChecks(tt.buckets))
+		})
+	}
+}
