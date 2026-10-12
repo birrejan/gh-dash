@@ -12,7 +12,9 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prompt"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/table"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
@@ -177,4 +179,34 @@ func TestSummarizeChecks(t *testing.T) {
 			require.Equal(t, tt.expected, summarizeChecks(tt.buckets))
 		})
 	}
+}
+
+func TestGetSectionColumns_MergeStateColumn(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../../../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+	ctx := &context.ProgramContext{Config: &cfg}
+
+	findColumn := func(columns []table.Column) *table.Column {
+		for i := range columns {
+			if columns[i].Title == constants.BehindIcon {
+				return &columns[i]
+			}
+		}
+		return nil
+	}
+
+	col := findColumn(GetSectionColumns(config.PrsSectionConfig{}, ctx))
+	require.NotNil(t, col, "the PR table should have an out-of-date column")
+	require.False(t, col.Hidden != nil && *col.Hidden, "the column is shown by default")
+
+	hidden := true
+	section := config.PrsSectionConfig{
+		Layout: config.PrsLayoutConfig{MergeState: config.ColumnConfig{Hidden: &hidden}},
+	}
+	col = findColumn(GetSectionColumns(section, ctx))
+	require.NotNil(t, col)
+	require.True(t, col.Hidden != nil && *col.Hidden, "layout.mergeState.hidden hides it")
 }

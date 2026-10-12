@@ -273,6 +273,7 @@ func GetSectionColumns(
 	)
 	stateLayout := config.MergeColumnConfigs(dLayout.State, sLayout.State)
 	ciLayout := config.MergeColumnConfigs(dLayout.Ci, sLayout.Ci)
+	mergeStateLayout := config.MergeColumnConfigs(dLayout.MergeState, sLayout.MergeState)
 	labelsLayout := config.MergeColumnConfigs(dLayout.Labels, sLayout.Labels)
 	linesLayout := config.MergeColumnConfigs(dLayout.Lines, sLayout.Lines)
 
@@ -318,6 +319,11 @@ func GetSectionColumns(
 				Width:  &ctx.Styles.PrSection.CiCellWidth,
 				Grow:   new(bool),
 				Hidden: ciLayout.Hidden,
+			},
+			{
+				Title:  constants.BehindIcon,
+				Width:  utils.IntPtr(3),
+				Hidden: mergeStateLayout.Hidden,
 			},
 			{
 				Title:  "",
@@ -388,6 +394,11 @@ func GetSectionColumns(
 			Width:  &ctx.Styles.PrSection.CiCellWidth,
 			Grow:   new(bool),
 			Hidden: ciLayout.Hidden,
+		},
+		{
+			Title:  constants.BehindIcon,
+			Width:  utils.IntPtr(3),
+			Hidden: mergeStateLayout.Hidden,
 		},
 		{
 			Title:  "",

@@ -14,6 +14,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/table"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
 
 func TestGetStatusChecksRollup(t *testing.T) {
@@ -309,6 +310,52 @@ func TestRenderLabels(t *testing.T) {
 				if !strings.Contains(result, want) {
 					t.Errorf("renderLabels() = %q, want substring %q", result, want)
 				}
+			}
+		})
+	}
+}
+
+func TestRenderMergeState(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../../../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := &context.ProgramContext{Config: &cfg, Theme: theme.ParseTheme(&cfg)}
+
+	tests := []struct {
+		name       string
+		data       *Data
+		want       string
+		wantBehind bool
+	}{
+		{name: "nil Primary", data: &Data{Primary: nil}, want: "-"},
+		{
+			name:       "behind its base branch",
+			data:       &Data{Primary: &data.PullRequestData{MergeStateStatus: "BEHIND"}},
+			wantBehind: true,
+		},
+		{
+			name: "up to date",
+			data: &Data{Primary: &data.PullRequestData{MergeStateStatus: "CLEAN"}},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pr := &PullRequest{Ctx: ctx, Data: tt.data}
+			got := pr.renderMergeState()
+			if tt.wantBehind {
+				if !strings.Contains(got, constants.BehindIcon) {
+					t.Errorf("renderMergeState() = %q, want it to contain %q", got, constants.BehindIcon)
+				}
+				return
+			}
+			if got != tt.want {
+				t.Errorf("renderMergeState() = %q, want %q", got, tt.want)
 			}
 		})
 	}

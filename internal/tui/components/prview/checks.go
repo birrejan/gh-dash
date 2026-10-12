@@ -144,6 +144,14 @@ func (m *Model) viewMergeStatus() (string, checkSectionStatus) {
 		title = "No conflicts with base branch"
 		subtitle = "Changes can be cleanly merged"
 		status = statusSuccess
+	} else if m.pr.Data.Primary.MergeStateStatus == "BEHIND" {
+		icon = m.ctx.Styles.Common.ActionRequiredGlyph
+		title = "This branch is out-of-date with the base branch"
+		subtitle = fmt.Sprintf(
+			"Merge the latest changes from %s into this branch",
+			m.pr.Data.Primary.BaseRefName,
+		)
+		status = statusWaiting
 	} else if m.pr.Data.Primary.IsDraft {
 		icon = m.ctx.Styles.Common.DraftGlyph
 		title = "This pull request is still a work in progress"

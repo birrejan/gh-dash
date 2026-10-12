@@ -161,6 +161,7 @@ type PrsLayoutConfig struct {
 	ReviewStatus ColumnConfig `yaml:"reviewStatus,omitempty"`
 	State        ColumnConfig `yaml:"state,omitempty"`
 	Ci           ColumnConfig `yaml:"ci,omitempty"`
+	MergeState   ColumnConfig `yaml:"mergeState,omitempty"`
 	Lines        ColumnConfig `yaml:"lines,omitempty"`
 	NumComments  ColumnConfig `yaml:"numComments,omitempty"`
 }

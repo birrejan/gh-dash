@@ -132,6 +132,18 @@ func (pr *PullRequest) renderCiStatus() string {
 	}
 }
 
+func (pr *PullRequest) renderMergeState() string {
+	if pr.Data.Primary == nil {
+		return "-"
+	}
+
+	if pr.Data.Primary.MergeStateStatus == "BEHIND" {
+		return pr.getTextStyle().Foreground(pr.Ctx.Theme.WarningText).Render(constants.BehindIcon)
+	}
+
+	return ""
+}
+
 func (pr *PullRequest) RenderLines(isSelected bool) string {
 	if pr.Data.Primary == nil {
 		return "-"
@@ -395,6 +407,7 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 			pr.renderNumComments(),
 			pr.renderReviewStatus(),
 			pr.renderCiStatus(),
+			pr.renderMergeState(),
 			pr.RenderLines(isSelected),
 			pr.renderUpdateAt(),
 			pr.renderCreatedAt(),
@@ -412,6 +425,7 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 		pr.renderNumComments(),
 		pr.renderReviewStatus(),
 		pr.renderCiStatus(),
+		pr.renderMergeState(),
 		pr.RenderLines(isSelected),
 		pr.renderUpdateAt(),
 		pr.renderCreatedAt(),

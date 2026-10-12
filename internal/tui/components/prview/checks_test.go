@@ -590,3 +590,17 @@ func TestRenderChecks_IgnoresAppSuitesThatNeverStart(t *testing.T) {
 	require.Contains(t, got, "Build")
 	require.NotContains(t, got, "Supabase")
 }
+
+func TestViewMergeStatus_Behind(t *testing.T) {
+	// A branch that is behind its base can't be merged until it is updated,
+	// which GitHub reports as mergeStateStatus BEHIND.
+	m := newTestModelForChecks(t, checksTestOptions{rollupState: "SUCCESS"})
+	m.pr.Data.Primary.MergeStateStatus = "BEHIND"
+	m.pr.Data.Primary.BaseRefName = "develop"
+
+	got, status := m.viewMergeStatus()
+
+	require.Contains(t, got, "This branch is out-of-date with the base branch")
+	require.Contains(t, got, "Merge the latest changes from develop into this branch")
+	require.Equal(t, statusWaiting, status)
+}
