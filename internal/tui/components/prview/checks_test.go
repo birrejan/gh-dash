@@ -537,3 +537,17 @@ func TestViewChecksBar_NarrowWidth_NoPanic(t *testing.T) {
 		}, "viewChecksBar panicked with width=%d", width)
 	}
 }
+
+func TestViewMergeStatus_Behind(t *testing.T) {
+	// A branch that is behind its base can't be merged until it is updated,
+	// which GitHub reports as mergeStateStatus BEHIND.
+	m := newTestModelForChecks(t, checksTestOptions{rollupState: "SUCCESS"})
+	m.pr.Data.Primary.MergeStateStatus = "BEHIND"
+	m.pr.Data.Primary.BaseRefName = "develop"
+
+	got, status := m.viewMergeStatus()
+
+	require.Contains(t, got, "This branch is out-of-date with the base branch")
+	require.Contains(t, got, "Merge the latest changes from develop into this branch")
+	require.Equal(t, statusWaiting, status)
+}
